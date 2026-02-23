@@ -86,7 +86,21 @@ socket.on("candidate", async (candidate) => {
 });
 
 document.getElementById("startShare").onclick = async () => {
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+  navigator.mediaDevices.getDisplayMedia({ video: true })
+    .then(stream => {
+      console.log("Partage démarré");
+      // ton code WebRTC ici
+    })
+    .catch(error => {
+      console.error("Erreur partage :", error);
+    });
+
+const params = new URLSearchParams(window.location.search);
+const isHost = params.get("host");
+
+if (isHost === "true") {
+  startScreenShare();
+}
 
   localVideo.srcObject = stream;
   stream.getTracks().forEach(track => peer.addTrack(track, stream));
