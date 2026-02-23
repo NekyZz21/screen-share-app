@@ -6,8 +6,15 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const path = require("path");
+const express = require("express");
 
 app.use(express.static("public"));
+
+app.get("/room/:roomId", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "room.html"));
+});
+
 
 io.on("connection", (socket) => {
 

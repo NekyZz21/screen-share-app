@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Room</title>
+    <style>
+        body {
+            background: #111;
+            color: white;
+            text-align: center;
+        }
+        video {
+            width: 80%;
+            margin-top: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Room</h1>
+    <video id="video" autoplay playsinline></video>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // 🔑 Récupérer l'id de la room depuis l'URL
+        const roomId = window.location.pathname.split("/")[2];
+        console.log("Room ID:", roomId);
+
+        const video = document.getElementById("video");
+
+        async function startScreenShare() {
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true
+            });
+
+            video.srcObject = stream;
+
+            socket.emit("join-room", roomId);
+        }
+
+        startScreenShare();
+    </script>
+
+</body>
+</html>
