@@ -6,7 +6,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-app.use(express.static("public")); // ton dossier qui contient room.html
+app.use(express.static("public"));
+app.get('/room/:id', (req, res) => {
+  const roomId = req.params.id;
+  res.sendFile(__dirname + '/room.html');
+});
 
 io.on("connection", (socket) => {
   console.log("Utilisateur connecté:", socket.id);
