@@ -1,49 +1,60 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Room</title>
-    <style>
-        body {
-            background: #111;
-            color: white;
-            text-align: center;
-        }
-        video {
-            width: 80%;
-            margin-top: 20px;
-            border-radius: 10px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Partage d'écran - Accueil</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    input { font-size: 16px; padding: 5px; }
+    button { font-size: 16px; padding: 10px 20px; margin: 10px; }
+  </style>
 </head>
 <body>
 
-    <h1>Room</h1>
-    <video id="video" autoplay playsinline></video>
+<h1>Partage d'écran</h1>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
+<!-- Bouton pour créer une room -->
+<button id="createBtn">Créer une room</button>
 
-        // 🔑 Récupérer l'id de la room depuis l'URL
-        const roomId = window.location.pathname.split("/")[2];
-        console.log("Room ID:", roomId);
+<!-- Formulaire pour rejoindre une room -->
+<div>
+  <input type="text" id="roomCode" placeholder="Entrez le code de la room" />
+  <button id="joinBtn">Rejoindre la room</button>
+</div>
 
-        const video = document.getElementById("video");
+<script>
+  // Générer un code aléatoire pour la room
+  function generateRoomCode(length = 6) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < length; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
 
-        async function startScreenShare() {
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: true
-            });
+  const createBtn = document.getElementById('createBtn');
+  const joinBtn = document.getElementById('joinBtn');
+  const roomInput = document.getElementById('roomCode');
 
-            video.srcObject = stream;
+  // Créer une room → host
+  createBtn.addEventListener('click', () => {
+    const roomCode = generateRoomCode();
+    // Redirection vers room.html avec ?host=true
+    window.location.href = `/room/${roomCode}?host=true`;
+  });
 
-            socket.emit("join-room", roomId);
-        }
-
-        startScreenShare();
-    </script>
+  // Rejoindre une room → viewer
+  joinBtn.addEventListener('click', () => {
+    const roomCode = roomInput.value.trim();
+    if (!roomCode) {
+      alert("Veuillez entrer un code de room valide !");
+      return;
+    }
+    // Redirection vers room.html sans host=true
+    window.location.href = `/room/${roomCode}`;
+  });
+</script>
 
 </body>
 </html>
