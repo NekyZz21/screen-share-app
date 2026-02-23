@@ -5,7 +5,12 @@ const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const path = require("path");
 
 app.use(express.static("public"));
@@ -16,6 +21,8 @@ app.get("/room/:roomId", (req, res) => {
 
 
 io.on("connection", (socket) => {
+
+  console.log("Utilisateur connecté :", socket.id);
 
   socket.on("join-room", (roomId) => {
     socket.join(roomId);
@@ -37,4 +44,6 @@ io.on("connection", (socket) => {
 
 });
 
-server.listen(process.env.PORT || 3000);
+server.listen(process.env.PORT || 3000, () => {
+  console.log("Serveur démarré");
+});
