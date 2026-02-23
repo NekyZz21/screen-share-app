@@ -7,7 +7,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const path = require("path");
-const express = require("express");
 
 app.use(express.static("public"));
 
