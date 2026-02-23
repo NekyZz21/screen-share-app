@@ -112,6 +112,11 @@
   const darkBtn = document.getElementById('darkModeBtn');
   let peerConnection;
 
+  const roomId = window.location.pathname.split('/')[2];
+  console.log("Room ID:", roomId);
+  const h1 = document.querySelector("main h1");
+  h1.innerText += ` : ${roomId}`;
+
   // Mode sombre / clair
   darkBtn.addEventListener('click', () => document.body.classList.toggle('dark'));
 
