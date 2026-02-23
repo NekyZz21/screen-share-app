@@ -2,44 +2,56 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid'); // pour générer des IDs uniques
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // port dynamique pour Render
 
-// Servir les fichiers statiques
-app.use(express.static('public'));
+// Servir fichiers statiques
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Page d'accueil qui crée une room
+// Page d'accueil simple : créer une room
 app.get('/', (req, res) => {
-  res.send(`
-    <h1>Créer une room de partage d'écran</h1>
-    <a href="/room/${uuidv4()}?host=true">Créer une room</a>
-  `);
+  const roomId = uuidv4();
+  res.redirect(`/room/${roomId}?host=true`);
 });
 
 // Route pour accéder à une room
 app.get('/room/:id', (req, res) => {
-  res.sendFile(__dirname + '/public/room.html');
+  res.sendFile(path.join(__dirname, 'public', 'room.html'));
 });
 
-// SOCKET.IO pour WebRTC
+// Socket.io : gestion des rooms
 io.on('connection', (socket) => {
   console.log("Nouvelle connexion:", socket.id);
 
-  socket.on("offer", (offer) => {
-    socket.broadcast.emit("offer", offer);
+  // Rejoindre une room
+  socket.on("join-room", (roomId) => {
+    socket.join(roomId);
+    console.log(`${socket.id} a rejoint la room ${roomId}`);
   });
 
-  socket.on("answer", (answer) => {
-    socket.broadcast.emit("answer", answer);
+  // Offre
+  socket.on("offer", ({roomId, offer}) => {
+    socket.to(roomId).emit("offer", offer);
   });
 
-  socket.on("ice-candidate", (candidate) => {
-    socket.broadcast.emit("ice-candidate", candidate);
+  // Réponse
+  socket.on("answer", ({roomId, answer}) => {
+    socket.to(roomId).emit("answer", answer);
+  });
+
+  // ICE candidates
+  socket.on("ice-candidate", ({roomId, candidate}) => {
+    socket.to(roomId).emit("ice-candidate", candidate);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Déconnexion:', socket.id);
   });
 });
 
-server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

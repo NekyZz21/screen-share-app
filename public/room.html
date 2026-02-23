@@ -18,9 +18,7 @@
       --primary-color: #1a73e8;
       --button-color: #fff;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background-color: var(--bg-color);
       color: var(--text-color);
@@ -29,7 +27,6 @@
       display: flex;
       flex-direction: column;
     }
-
     header {
       display: flex;
       justify-content: space-between;
@@ -41,7 +38,6 @@
       top: 0;
       z-index: 100;
     }
-
     header img.logo { height: 50px; }
     header button { 
       background-color: var(--primary-color);
@@ -52,7 +48,6 @@
       cursor: pointer;
       font-size: 14px;
     }
-
     main {
       flex: 1;
       display: flex;
@@ -62,16 +57,13 @@
       padding: 30px 20px;
       text-align: center;
     }
-
     h1 { margin-bottom: 30px; font-size: 2rem; }
-
     video {
       width: 80%;
       max-width: 900px;
       border-radius: 10px;
       border: 2px solid #ccc;
     }
-
     button.action-btn {
       margin-top: 20px;
       padding: 12px 25px;
@@ -84,7 +76,6 @@
       transition: 0.2s;
     }
     button.action-btn:hover { opacity: 0.9; transform: scale(1.05); }
-
     @media(max-width: 500px) {
       video { width: 100%; }
       button.action-btn { width: 90%; }
@@ -112,19 +103,25 @@
   const darkBtn = document.getElementById('darkModeBtn');
   let peerConnection;
 
+  // --- Mode sombre / clair ---
+  darkBtn.addEventListener('click', () => document.body.classList.toggle('dark'));
+
+  // --- Récupération ID de la room depuis URL ---
   const roomId = window.location.pathname.split('/')[2];
   console.log("Room ID:", roomId);
   const h1 = document.querySelector("main h1");
   h1.innerText += ` : ${roomId}`;
 
-  // Mode sombre / clair
-  darkBtn.addEventListener('click', () => document.body.classList.toggle('dark'));
+  // --- a) rejoindre la room côté socket.io ---
+  socket.emit("join-room", roomId);
 
+  // Vérifier si c'est le host
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get("host") === "true";
 
   const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
+  // --- Fonction pour partager l'écran ---
   async function startScreenShare() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -133,35 +130,49 @@
       peerConnection = new RTCPeerConnection(configuration);
       stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
-      peerConnection.onicecandidate = (event) => { if(event.candidate) socket.emit("ice-candidate", event.candidate); };
+      peerConnection.onicecandidate = (event) => {
+        if(event.candidate) socket.emit("ice-candidate", { roomId, candidate: event.candidate }); // b
+      };
 
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
-      socket.emit("offer", offer);
+      socket.emit("offer", { roomId, offer }); // b
 
     } catch (err) { console.error("Erreur partage d'écran:", err); }
   }
 
+  // --- Fonction pour voir l'écran du host ---
   async function startViewer() {
     peerConnection = new RTCPeerConnection(configuration);
+
     peerConnection.ontrack = (event) => { video.srcObject = event.streams[0]; };
-    peerConnection.onicecandidate = (event) => { if(event.candidate) socket.emit("ice-candidate", event.candidate); };
+
+    peerConnection.onicecandidate = (event) => {
+      if(event.candidate) socket.emit("ice-candidate", { roomId, candidate: event.candidate }); // b
+    };
   }
 
+  // --- Gestion des signaux WebRTC ---
   socket.on("offer", async (offer) => {
     if (!isHost) {
       await startViewer();
       await peerConnection.setRemoteDescription(offer);
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      socket.emit("answer", answer);
+      socket.emit("answer", { roomId, answer }); // b
     }
   });
 
-  socket.on("answer", async (answer) => { if(isHost && peerConnection) await peerConnection.setRemoteDescription(answer); });
-  socket.on("ice-candidate", async (candidate) => { try { await peerConnection.addIceCandidate(candidate); } catch(e) { console.error("ICE candidate error:", e); } });
+  socket.on("answer", async (answer) => {
+    if(isHost && peerConnection) await peerConnection.setRemoteDescription(answer);
+  });
 
-  // Host : affiche bouton partager
+  socket.on("ice-candidate", async (candidate) => {
+    try { await peerConnection.addIceCandidate(candidate); } 
+    catch(e) { console.error("ICE candidate error:", e); }
+  });
+
+  // --- Affichage du bouton partager pour le host ---
   if (isHost) {
     shareBtn.style.display = "inline-block";
     shareBtn.addEventListener('click', startScreenShare);
