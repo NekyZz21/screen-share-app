@@ -2,58 +2,167 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Partage d'écran - Accueil</title>
+  <title>Room de partage d'écran</title>
+  <link rel="icon" href="/logo.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-    input { font-size: 16px; padding: 5px; }
-    button { font-size: 16px; padding: 10px 20px; margin: 10px; }
+    :root {
+      --bg-color: #f7f9fc;
+      --text-color: #1a1a1a;
+      --primary-color: #0d6efd;
+      --button-color: #fff;
+    }
+    body.dark {
+      --bg-color: #121212;
+      --text-color: #eee;
+      --primary-color: #1a73e8;
+      --button-color: #fff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+      background-color: var(--bg-color);
+      border-bottom: 1px solid #ccc;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header img.logo { height: 50px; }
+    header button { 
+      background-color: var(--primary-color);
+      color: var(--button-color);
+      border: none; 
+      padding: 10px 20px; 
+      border-radius: 25px; 
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    h1 { margin-bottom: 30px; font-size: 2rem; }
+
+    video {
+      width: 80%;
+      max-width: 900px;
+      border-radius: 10px;
+      border: 2px solid #ccc;
+    }
+
+    button.action-btn {
+      margin-top: 20px;
+      padding: 12px 25px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      background-color: var(--primary-color);
+      color: var(--button-color);
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button.action-btn:hover { opacity: 0.9; transform: scale(1.05); }
+
+    @media(max-width: 500px) {
+      video { width: 100%; }
+      button.action-btn { width: 90%; }
+    }
   </style>
 </head>
 <body>
 
-<h1>Partage d'écran</h1>
+<header>
+  <img src="/logo.png" alt="Logo" class="logo">
+  <button id="darkModeBtn">Mode Sombre / Clair</button>
+</header>
 
-<!-- Bouton pour créer une room -->
-<button id="createBtn">Créer une room</button>
+<main>
+  <h1>Room de partage d'écran</h1>
+  <video id="video" autoplay playsinline></video>
+  <button id="shareBtn" class="action-btn" style="display:none;">Partager mon écran</button>
+</main>
 
-<!-- Formulaire pour rejoindre une room -->
-<div>
-  <input type="text" id="roomCode" placeholder="Entrez le code de la room" />
-  <button id="joinBtn">Rejoindre la room</button>
-</div>
-
+<script src="/socket.io/socket.io.js"></script>
 <script>
-  // Générer un code aléatoire pour la room
-  function generateRoomCode(length = 6) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < length; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+  const socket = io();
+  const video = document.getElementById('video');
+  const shareBtn = document.getElementById('shareBtn');
+  const darkBtn = document.getElementById('darkModeBtn');
+  let peerConnection;
+
+  // Mode sombre / clair
+  darkBtn.addEventListener('click', () => document.body.classList.toggle('dark'));
+
+  const params = new URLSearchParams(window.location.search);
+  const isHost = params.get("host") === "true";
+
+  const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+  async function startScreenShare() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      video.srcObject = stream;
+
+      peerConnection = new RTCPeerConnection(configuration);
+      stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+
+      peerConnection.onicecandidate = (event) => { if(event.candidate) socket.emit("ice-candidate", event.candidate); };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      socket.emit("offer", offer);
+
+    } catch (err) { console.error("Erreur partage d'écran:", err); }
   }
 
-  const createBtn = document.getElementById('createBtn');
-  const joinBtn = document.getElementById('joinBtn');
-  const roomInput = document.getElementById('roomCode');
+  async function startViewer() {
+    peerConnection = new RTCPeerConnection(configuration);
+    peerConnection.ontrack = (event) => { video.srcObject = event.streams[0]; };
+    peerConnection.onicecandidate = (event) => { if(event.candidate) socket.emit("ice-candidate", event.candidate); };
+  }
 
-  // Créer une room → host
-  createBtn.addEventListener('click', () => {
-    const roomCode = generateRoomCode();
-    // Redirection vers room.html avec ?host=true
-    window.location.href = `/room/${roomCode}?host=true`;
-  });
-
-  // Rejoindre une room → viewer
-  joinBtn.addEventListener('click', () => {
-    const roomCode = roomInput.value.trim();
-    if (!roomCode) {
-      alert("Veuillez entrer un code de room valide !");
-      return;
+  socket.on("offer", async (offer) => {
+    if (!isHost) {
+      await startViewer();
+      await peerConnection.setRemoteDescription(offer);
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit("answer", answer);
     }
-    // Redirection vers room.html sans host=true
-    window.location.href = `/room/${roomCode}`;
   });
+
+  socket.on("answer", async (answer) => { if(isHost && peerConnection) await peerConnection.setRemoteDescription(answer); });
+  socket.on("ice-candidate", async (candidate) => { try { await peerConnection.addIceCandidate(candidate); } catch(e) { console.error("ICE candidate error:", e); } });
+
+  // Host : affiche bouton partager
+  if (isHost) {
+    shareBtn.style.display = "inline-block";
+    shareBtn.addEventListener('click', startScreenShare);
+  } else {
+    startViewer();
+  }
 </script>
 
 </body>
